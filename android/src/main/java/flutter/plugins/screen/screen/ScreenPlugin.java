@@ -2,6 +2,11 @@ package flutter.plugins.screen.screen;
 
 import android.provider.Settings;
 import android.view.WindowManager;
+import android.os.Build;
+import android.app.KeyguardManager;
+import android.app.KeyguardManager.KeyguardLock;
+import android.os.PowerManager;
+import android.content.Context;
 
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
@@ -18,6 +23,7 @@ public class ScreenPlugin implements MethodCallHandler {
     this._registrar = registrar;
   }
   private Registrar _registrar;
+  private PowerManager.WakeLock _wakeLock;
 
   public static void registerWith(Registrar registrar) {
     final MethodChannel channel = new MethodChannel(registrar.messenger(), "github.com/clovisnicolas/flutter_screen");
@@ -53,11 +59,52 @@ public class ScreenPlugin implements MethodCallHandler {
         }
         result.success(null);
         break;
-
-      default:
-        result.notImplemented();
-        break;
-    }
+	  case "onTop":
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        _registrar.activity().setShowWhenLocked(true);
+        _registrar.activity().setTurnScreenOn(true);
+        KeyguardManager keyguardManager = (KeyguardManager)_registrar.activity().getSystemService(Context.KEYGUARD_SERVICE);
+        keyguardManager.requestDismissKeyguard(_registrar.activity(), null);
+        //_registrar.activity().getWindow().addFlags(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+      } else {
+        _registrar.activity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+          | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+          | WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+          | WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+          | WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
+          //| WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY); // 20190704 Smart Cover issue test
+        /*_registrar.activity().getWindow().addFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON);*/
+      }
+      if(_wakeLock != null)
+        _wakeLock.release();
+      PowerManager pm = (PowerManager) _registrar.activity().getSystemService(Context.POWER_SERVICE);
+      _wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK
+                  | PowerManager.ACQUIRE_CAUSES_WAKEUP
+                  | PowerManager.ON_AFTER_RELEASE, "StarryPower");
+      _wakeLock.acquire();
+      break;
+	  case "unlockTop":
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+        _registrar.activity().setShowWhenLocked(false);
+        _registrar.activity().setTurnScreenOn(false);
+        //_registrar.activity().getWindow().clearFlags(WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+      } else {
+        _registrar.activity().getWindow().clearFlags(WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD |
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED |
+            WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON | 
+            WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON |
+            WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON);
+        //    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY);
+      }
+      if(_wakeLock != null)
+        _wakeLock.release();
+      break;
+        default:
+          result.notImplemented();
+          break;
+      }
   }
 
   private float getBrightness(){
