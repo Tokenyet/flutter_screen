@@ -9,4 +9,6 @@ class Screen {
   static Future setBrightness(double brightness) =>_channel.invokeMethod('setBrightness',{"brightness" : brightness});
   static Future<bool> get isKeptOn async => (await _channel.invokeMethod('isKeptOn')) as bool;
   static Future keepOn(bool on) => _channel.invokeMethod('keepOn', {"on" : on});
+  static Future onTop() => _channel.invokeMethod('onTop');
+  static Future unlockTop() => _channel.invokeMethod('unlockTop');
 }
